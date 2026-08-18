@@ -7,6 +7,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+Import-Module Az.Accounts, Az.ResourceGraph
+
 # Automation uses the managed identity. On a PC this falls back to an interactive login.
 if ($env:AUTOMATION_ASSET_ACCOUNTID) {
     Connect-AzAccount -Identity | Out-Null
