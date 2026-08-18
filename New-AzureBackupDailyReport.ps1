@@ -18,7 +18,7 @@ else {
 $since = [datetime]::UtcNow.AddHours(-$LookbackHours).ToString('yyyy-MM-ddTHH:mm:ssZ')
 $subs = @(Get-AzSubscription | Where-Object State -eq 'Enabled' | ForEach-Object Id)
 
-$jobs = @(Search-AzGraph -Subscription $subs -First 1000 -Query @"
+$result = Search-AzGraph -Subscription $subs -First 1000 -Query @"
 RecoveryServicesResources
 | where type =~ 'microsoft.recoveryservices/vaults/backupjobs'
 | extend startTime = todatetime(properties.startTime)
@@ -29,13 +29,14 @@ RecoveryServicesResources
           Started = startTime,
           Message = tostring(properties.statusMessage)
 | order by Started desc
-"@)
+"@
+# Search-AzGraph returns a response object; the jobs are in .Data
+$jobs = @($(if ($result.PSObject.Properties['Data']) { $result.Data } else { $result }))
 
-$ok      = @($jobs | Where-Object Status -eq 'Completed').Count
-$failed  = @($jobs | Where-Object Status -eq 'Failed').Count
-$warning = @($jobs | Where-Object Status -like '*Warning*').Count
-$running = @($jobs | Where-Object Status -eq 'InProgress').Count
-$problems = @($jobs | Where-Object { $_.Status -eq 'Failed' -or $_.Status -like '*Warning*' })
+$ok      = @($jobs | Where-Object { $_.Status -match 'Completed|Succeeded|Success' -and $_.Status -notmatch 'Warning' }).Count
+$failed  = @($jobs | Where-Object { $_.Status -match 'Failed' }).Count
+$warning = @($jobs | Where-Object { $_.Status -match 'Warning' }).Count
+$running = @($jobs | Where-Object { $_.Status -match 'InProgress|Running' }).Count
 
 $css = @'
 <style>
@@ -59,10 +60,10 @@ $pre = @"
   <span class="kpi warn">$warning warnings</span>
   <span class="kpi">$running running</span>
 </p>
-<h2>Failed and warning jobs</h2>
+<h2>Backup jobs</h2>
 "@
 
-$html = $problems |
+$html = $jobs |
     Select-Object Item, Vault, Status, Started, Message |
     ConvertTo-Html -Head $css -PreContent $pre |
     Out-String
