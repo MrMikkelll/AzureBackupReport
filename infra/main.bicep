@@ -35,7 +35,7 @@ resource runtimeEnv 'Microsoft.Automation/automationAccounts/runtimeEnvironments
   name: runtimeEnvironmentName
   location: location
   properties: {
-    description: 'PowerShell 7.6 with the built-in Az 15.1.0 package (includes Az.Accounts).'
+    description: 'PowerShell 7.6 with Az 15.1.0 and Microsoft Graph mail cmdlets.'
     runtime: {
       language: 'PowerShell'
       version: '7.6'
@@ -56,6 +56,29 @@ resource azResourceGraph 'Microsoft.Automation/automationAccounts/runtimeEnviron
       version: '1.2.1'
     }
   }
+}
+
+resource graphAuth 'Microsoft.Automation/automationAccounts/runtimeEnvironments/packages@2024-10-23' = {
+  parent: runtimeEnv
+  name: 'Microsoft.Graph.Authentication'
+  properties: {
+    contentLink: {
+      uri: 'https://www.powershellgallery.com/api/v2/package/Microsoft.Graph.Authentication'
+    }
+  }
+}
+
+resource graphMail 'Microsoft.Automation/automationAccounts/runtimeEnvironments/packages@2024-10-23' = {
+  parent: runtimeEnv
+  name: 'Microsoft.Graph.Users.Actions'
+  properties: {
+    contentLink: {
+      uri: 'https://www.powershellgallery.com/api/v2/package/Microsoft.Graph.Users.Actions'
+    }
+  }
+  dependsOn: [
+    graphAuth
+  ]
 }
 
 resource dailySchedule 'Microsoft.Automation/automationAccounts/schedules@2023-11-01' = {

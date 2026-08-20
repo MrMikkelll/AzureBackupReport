@@ -7,15 +7,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-Import-Module Az.Accounts, Az.ResourceGraph
-
-# Automation uses the managed identity. On a PC this falls back to an interactive login.
-if ($env:AUTOMATION_ASSET_ACCOUNTID) {
-    Connect-AzAccount -Identity | Out-Null
-}
-else {
-    Connect-AzAccount | Out-Null
-}
+Import-Module Az.Accounts, Az.ResourceGraph, Microsoft.Graph.Authentication, Microsoft.Graph.Users.Actions
+Connect-AzAccount -Identity | Out-Null
+Connect-MgGraph -Identity | Out-Null
 
 $since = [datetime]::UtcNow.AddHours(-$LookbackHours).ToString('yyyy-MM-ddTHH:mm:ssZ')
 $subs = @(Get-AzSubscription | Where-Object State -eq 'Enabled' | ForEach-Object Id)
@@ -32,7 +26,6 @@ RecoveryServicesResources
           Message = tostring(properties.statusMessage)
 | order by Started desc
 "@
-# Search-AzGraph returns a response object; the jobs are in .Data
 $jobs = @($(if ($result.PSObject.Properties['Data']) { $result.Data } else { $result }))
 
 $ok      = @($jobs | Where-Object { $_.Status -match 'Completed|Succeeded|Success' -and $_.Status -notmatch 'Warning' }).Count
@@ -71,26 +64,13 @@ $html = $jobs |
     Out-String
 
 if ($MailFrom -and $MailTo) {
-    $token = (Get-AzAccessToken -ResourceUrl 'https://graph.microsoft.com').Token
-    if ($token -is [securestring]) {
-        $token = [System.Net.NetworkCredential]::new('', $token).Password
-    }
-    $mail = @{
+    Send-MgUserMail -UserId $MailFrom -BodyParameter @{
         message = @{
-            subject = "Azure Backup report - $failed failed"
-            body    = @{ contentType = 'HTML'; content = $html }
+            subject      = "Azure Backup report - $failed failed"
+            body         = @{ contentType = 'HTML'; content = $html }
             toRecipients = @(@{ emailAddress = @{ address = $MailTo } })
         }
-    } | ConvertTo-Json -Depth 6 -Compress
-    Invoke-RestMethod -Method Post -ContentType 'application/json' -Body $mail `
-        -Uri ("https://graph.microsoft.com/v1.0/users/$MailFrom/sendMail") `
-        -Headers @{ Authorization = "Bearer $token" }
-}
-
-if (-not $env:AUTOMATION_ASSET_ACCOUNTID) {
-    $file = Join-Path (Get-Location) 'AzureBackupReport.html'
-    $html | Set-Content -Path $file -Encoding utf8
-    Write-Output "Wrote $file"
+    }
 }
 
 Write-Output "Jobs=$($jobs.Count) OK=$ok Failed=$failed Warning=$warning Running=$running"
