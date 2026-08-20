@@ -28,18 +28,50 @@ $deployment = New-AzResourceGroupDeployment `
     -mailTo $MailTo `
     -scheduleStartTime $start.ToString('yyyy-MM-ddTHH:mm:ssZ')
 
-Import-AzAutomationRunbook `
-    -ResourceGroupName $ResourceGroupName `
-    -AutomationAccountName $AutomationAccountName `
-    -Name 'New-AzureBackupDailyReport' `
-    -Type PowerShell72 `
-    -Path $runbookFile `
-    -Force | Out-Null
+$runtimeName = $deployment.Outputs.runtimeEnvironmentName.Value
+$subId = (Get-AzContext).Subscription.Id
+$runbookName = 'New-AzureBackupDailyReport'
+$runbookPath = "/subscriptions/$subId/resourceGroups/$ResourceGroupName/providers/Microsoft.Automation/automationAccounts/$AutomationAccountName/runbooks/$runbookName"
+
+# Import-AzAutomationRunbook has no RuntimeEnvironment parameter; use the 2024-10-23 API.
+$runbookMeta = @{
+    name     = $runbookName
+    location = $Location
+    properties = @{
+        runbookType         = 'PowerShell'
+        runtimeEnvironment  = $runtimeName
+        logProgress         = $false
+        logVerbose          = $false
+        draft               = @{}
+    }
+} | ConvertTo-Json -Depth 6 -Compress
+
+$create = Invoke-AzRestMethod -Method PUT -Path "$runbookPath`?api-version=2024-10-23" -Payload $runbookMeta
+if ($create.StatusCode -notin 200, 201) {
+    # Existing PowerShell 7.2 runbooks cannot change type in place.
+    Write-Output "Replacing the existing runbook so it can use runtime $runtimeName..."
+    Remove-AzAutomationRunbook `
+        -ResourceGroupName $ResourceGroupName `
+        -AutomationAccountName $AutomationAccountName `
+        -Name $runbookName `
+        -Force `
+        -ErrorAction SilentlyContinue
+    $create = Invoke-AzRestMethod -Method PUT -Path "$runbookPath`?api-version=2024-10-23" -Payload $runbookMeta
+}
+if ($create.StatusCode -notin 200, 201) {
+    throw "Failed to create runbook ($($create.StatusCode)): $($create.Content)"
+}
+
+$content = Get-Content -Raw -Path $runbookFile
+$draft = Invoke-AzRestMethod -Method PUT -Path "$runbookPath/draft/content?api-version=2024-10-23" -Payload $content
+if ($draft.StatusCode -notin 200, 201, 202) {
+    throw "Failed to upload runbook draft ($($draft.StatusCode)): $($draft.Content)"
+}
 
 Publish-AzAutomationRunbook `
     -ResourceGroupName $ResourceGroupName `
     -AutomationAccountName $AutomationAccountName `
-    -Name 'New-AzureBackupDailyReport' | Out-Null
+    -Name $runbookName | Out-Null
 
 try {
     Unregister-AzAutomationScheduledRunbook `
@@ -61,6 +93,7 @@ Register-AzAutomationScheduledRunbook `
 
 $principalId = $deployment.Outputs.principalId.Value
 Write-Output "Deployed $AutomationAccountName"
+Write-Output "Runtime: $runtimeName (PowerShell 7.6)"
 Write-Output "Managed identity: $principalId"
 Write-Output "Still needed:"
 Write-Output "  1. Reader on each subscription:  New-AzRoleAssignment -ObjectId $principalId -RoleDefinitionName Reader -Scope /subscriptions/<id>"
