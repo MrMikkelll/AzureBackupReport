@@ -2,10 +2,12 @@
 
 One PowerShell 7 runbook: [New-AzureBackupDailyReport.ps1](New-AzureBackupDailyReport.ps1)
 
+It does not use Az or Microsoft.Graph PowerShell modules. Backup jobs come from the Azure Resource Graph REST API; mail is sent with Microsoft Graph `sendMail`. Tokens come from the Automation managed identity, or from Azure CLI locally.
+
 **On your PC**
 
 ```powershell
-Install-Module Az.Accounts, Az.ResourceGraph -Scope CurrentUser
+az login
 pwsh -File .\New-AzureBackupDailyReport.ps1
 ```
 
@@ -22,8 +24,6 @@ pwsh -File .\infra\deploy.ps1 `
     -MailTo 'ops@contoso.com'
 ```
 
-That creates the Automation Account (managed identity, PowerShell 7.2 modules, daily 06:00 UTC schedule) and publishes the runbook.
-
-Automation's PowerShell 7.2 runtime cannot load Az.Accounts 5.3 or later. The template pins **Az.Accounts 5.2.0** and **Az.ResourceGraph 1.2.1**. If the account already has a newer Az.Accounts, wait until those modules show as Available (Runtime 7.2) after deploy, then start the runbook.
+That creates the Automation Account (managed identity, daily 06:00 UTC schedule) and publishes the PowerShell 7.2 runbook. The runbook needs no Az modules in the Automation account; leftover Az.Accounts / Az.ResourceGraph modules can be left or deleted.
 
 Then assign the printed identity **Reader** on your subscriptions, and Graph **Mail.Send** so it can send as `MailFrom`.

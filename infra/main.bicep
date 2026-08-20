@@ -28,33 +28,6 @@ resource automationAccount 'Microsoft.Automation/automationAccounts@2023-11-01' 
   }
 }
 
-// Az.Accounts 5.3+ needs .NET 8 / PowerShell 7.4. Pin 5.2.0 for Automation's 7.2 runtime.
-resource azAccounts 'Microsoft.Automation/automationAccounts/powerShell72Modules@2023-11-01' = {
-  parent: automationAccount
-  name: 'Az.Accounts'
-  properties: {
-    contentLink: {
-      uri: 'https://www.powershellgallery.com/api/v2/package/Az.Accounts/5.2.0'
-      version: '5.2.0'
-    }
-  }
-}
-
-// 1.2.1 works with Az.Accounts 5.2.0. 1.3+ requires Az.Accounts 5.5+.
-resource azResourceGraph 'Microsoft.Automation/automationAccounts/powerShell72Modules@2023-11-01' = {
-  parent: automationAccount
-  name: 'Az.ResourceGraph'
-  properties: {
-    contentLink: {
-      uri: 'https://www.powershellgallery.com/api/v2/package/Az.ResourceGraph/1.2.1'
-      version: '1.2.1'
-    }
-  }
-  dependsOn: [
-    azAccounts
-  ]
-}
-
 resource dailySchedule 'Microsoft.Automation/automationAccounts/schedules@2023-11-01' = {
   parent: automationAccount
   name: 'Daily'
