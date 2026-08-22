@@ -22,7 +22,7 @@ Edit [`infra/main.parameters.json`](infra/main.parameters.json) and set `mailFro
 5. Select the resource group. Fill in:
 
    - `mailFrom` — existing mailbox UPN (shared mailbox recommended)
-   - `mailTo` — recipient
+   - `mailTo` — recipients, comma-separated (for example `ops@contoso.com, noc@contoso.com`)
    - `automationAccountName` — optional, default `aa-backup-report`
 6. **Review + create**, then **Create**.
 7. Open the deployment outputs and copy `principalId`.

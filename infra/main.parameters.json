@@ -4,7 +4,7 @@
   "parameters": {
     "automationAccountName": { "value": "aa-backup-report" },
     "mailFrom": { "value": "backup-reports@contoso.com" },
-    "mailTo": { "value": "ops@contoso.com" },
+    "mailTo": { "value": "ops@contoso.com, noc@contoso.com" },
     "lookbackHours": { "value": 24 }
   }
 }

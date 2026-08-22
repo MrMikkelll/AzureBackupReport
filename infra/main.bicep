@@ -11,7 +11,7 @@ param automationAccountName string = 'aa-backup-report'
 @description('Existing mailbox UPN that sends the report (shared mailbox recommended).')
 param mailFrom string
 
-@description('Recipient email address.')
+@description('Recipient email addresses, comma-separated.')
 param mailTo string
 
 @description('Hours of backup jobs to include. Passed to the runbook.')

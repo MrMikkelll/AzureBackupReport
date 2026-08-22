@@ -9,7 +9,7 @@ param(
     [Parameter(Mandatory)]
     [string]$MailFrom,
 
-    # One recipient address.
+    # Recipients, comma or semicolon separated.
     [Parameter(Mandatory)]
     [string]$MailTo,
 
@@ -88,11 +88,20 @@ if ($token -is [securestring]) {
     $token = [System.Net.NetworkCredential]::new('', $token).Password
 }
 
+$recipients = @(
+    $MailTo.Split(@(',', ';'), [StringSplitOptions]::RemoveEmptyEntries) |
+        ForEach-Object { $_.Trim() } |
+        Where-Object { $_ }
+)
+if ($recipients.Count -eq 0) {
+    throw 'MailTo must contain at least one email address.'
+}
+
 $mail = @{
     message = @{
         subject      = "Azure Backup report - $failed failed"
         body         = @{ contentType = 'HTML'; content = $html }
-        toRecipients = @(@{ emailAddress = @{ address = $MailTo } })
+        toRecipients = @($recipients | ForEach-Object { @{ emailAddress = @{ address = $_ } } })
     }
 } | ConvertTo-Json -Depth 6 -Compress
 
