@@ -1,0 +1,10 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "automationAccountName": { "value": "aa-backup-report" },
+    "mailFrom": { "value": "backup-reports@contoso.com" },
+    "mailTo": { "value": "ops@contoso.com" },
+    "lookbackHours": { "value": 24 }
+  }
+}

@@ -1,23 +1,35 @@
 #Requires -Version 7.0
+<#
+  Azure Automation runbook (PowerShell 7.2).
+  Signs in with the account's managed identity, reads Recovery Services
+  backup jobs from Resource Graph, and emails an HTML report with Graph Mail.Send.
+#>
 param(
+    # Existing mailbox UPN that sends the mail (shared mailbox is typical).
+    [Parameter(Mandatory)]
     [string]$MailFrom,
+
+    # One recipient address.
+    [Parameter(Mandatory)]
     [string]$MailTo,
+
+    # How far back to include backup jobs.
     [int]$LookbackHours = 24
 )
 
 $ErrorActionPreference = 'Stop'
 
-# Automation uses the managed identity. On a PC this falls back to an interactive login.
-if ($env:AUTOMATION_ASSET_ACCOUNTID) {
-    Connect-AzAccount -Identity | Out-Null
-}
-else {
-    Connect-AzAccount | Out-Null
-}
+# Managed identity on this Automation Account. Needs Reader on the subscriptions
+# and Graph application permission Mail.Send.
+Connect-AzAccount -Identity | Out-Null
 
+# Jobs that started after this UTC timestamp.
 $since = [datetime]::UtcNow.AddHours(-$LookbackHours).ToString('yyyy-MM-ddTHH:mm:ssZ')
+
+# Every enabled subscription this identity can list.
 $subs = @(Get-AzSubscription | Where-Object State -eq 'Enabled' | ForEach-Object Id)
 
+# One Resource Graph query across those subscriptions (max 1000 rows).
 $result = Search-AzGraph -Subscription $subs -First 1000 -Query @"
 RecoveryServicesResources
 | where type =~ 'microsoft.recoveryservices/vaults/backupjobs'
@@ -30,7 +42,8 @@ RecoveryServicesResources
           Message = tostring(properties.statusMessage)
 | order by Started desc
 "@
-# Search-AzGraph returns a response object; the jobs are in .Data
+
+# Newer Az.ResourceGraph wraps rows in .Data. Older versions return the rows directly.
 $jobs = @($(if ($result.PSObject.Properties['Data']) { $result.Data } else { $result }))
 
 $ok      = @($jobs | Where-Object { $_.Status -match 'Completed|Succeeded|Success' -and $_.Status -notmatch 'Warning' }).Count
@@ -38,6 +51,7 @@ $failed  = @($jobs | Where-Object { $_.Status -match 'Failed' }).Count
 $warning = @($jobs | Where-Object { $_.Status -match 'Warning' }).Count
 $running = @($jobs | Where-Object { $_.Status -match 'InProgress|Running' }).Count
 
+# Simple HTML that works in Outlook (no JavaScript).
 $css = @'
 <style>
   body { font-family: Segoe UI, Arial, sans-serif; margin: 24px; color: #323130; }
@@ -68,27 +82,23 @@ $html = $jobs |
     ConvertTo-Html -Head $css -PreContent $pre |
     Out-String
 
-if ($MailFrom -and $MailTo) {
-    $token = (Get-AzAccessToken -ResourceUrl 'https://graph.microsoft.com').Token
-    if ($token -is [securestring]) {
-        $token = [System.Net.NetworkCredential]::new('', $token).Password
-    }
-    $mail = @{
-        message = @{
-            subject = "Azure Backup report - $failed failed"
-            body    = @{ contentType = 'HTML'; content = $html }
-            toRecipients = @(@{ emailAddress = @{ address = $MailTo } })
-        }
-    } | ConvertTo-Json -Depth 6 -Compress
-    Invoke-RestMethod -Method Post -ContentType 'application/json' -Body $mail `
-        -Uri ("https://graph.microsoft.com/v1.0/users/$MailFrom/sendMail") `
-        -Headers @{ Authorization = "Bearer $token" }
+# Graph token. Az.Accounts may return it as a SecureString.
+$token = (Get-AzAccessToken -ResourceUrl 'https://graph.microsoft.com').Token
+if ($token -is [securestring]) {
+    $token = [System.Net.NetworkCredential]::new('', $token).Password
 }
 
-if (-not $env:AUTOMATION_ASSET_ACCOUNTID) {
-    $file = Join-Path (Get-Location) 'AzureBackupReport.html'
-    $html | Set-Content -Path $file -Encoding utf8
-    Write-Output "Wrote $file"
-}
+$mail = @{
+    message = @{
+        subject      = "Azure Backup report - $failed failed"
+        body         = @{ contentType = 'HTML'; content = $html }
+        toRecipients = @(@{ emailAddress = @{ address = $MailTo } })
+    }
+} | ConvertTo-Json -Depth 6 -Compress
+
+# Application Mail.Send: send as MailFrom (the identity has no mailbox of its own).
+Invoke-RestMethod -Method Post -ContentType 'application/json' -Body $mail `
+    -Uri ("https://graph.microsoft.com/v1.0/users/$MailFrom/sendMail") `
+    -Headers @{ Authorization = "Bearer $token" }
 
 Write-Output "Jobs=$($jobs.Count) OK=$ok Failed=$failed Warning=$warning Running=$running"
