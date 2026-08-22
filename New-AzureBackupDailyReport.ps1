@@ -29,13 +29,15 @@ $since = [datetime]::UtcNow.AddHours(-$LookbackHours).ToString('yyyy-MM-ddTHH:mm
 # Every enabled subscription this identity can list.
 $subs = @(Get-AzSubscription | Where-Object State -eq 'Enabled' | ForEach-Object Id)
 
-# One Resource Graph query across those subscriptions (max 1000 rows).
+# One query: VM, SQL (SQLDataBase), files, and other Recovery Services jobs.
 $result = Search-AzGraph -Subscription $subs -First 1000 -Query @"
 RecoveryServicesResources
 | where type =~ 'microsoft.recoveryservices/vaults/backupjobs'
 | extend startTime = todatetime(properties.startTime)
 | where startTime >= datetime($since)
 | project Item = tostring(properties.entityFriendlyName),
+          Workload = tostring(properties.workloadType),
+          Operation = tostring(properties.operation),
           Vault = tostring(split(id, '/')[8]),
           Status = tostring(properties.status),
           Started = startTime,
@@ -50,6 +52,7 @@ $ok      = @($jobs | Where-Object { $_.Status -match 'Completed|Succeeded|Succes
 $failed  = @($jobs | Where-Object { $_.Status -match 'Failed' }).Count
 $warning = @($jobs | Where-Object { $_.Status -match 'Warning' }).Count
 $running = @($jobs | Where-Object { $_.Status -match 'InProgress|Running' }).Count
+$sql     = @($jobs | Where-Object { $_.Workload -match 'SQL' }).Count
 
 # Simple HTML that works in Outlook (no JavaScript).
 $css = @'
@@ -67,7 +70,7 @@ $css = @'
 
 $pre = @"
 <h1>Azure Backup report</h1>
-<p>Last $LookbackHours hours &nbsp;|&nbsp; $($subs.Count) subscriptions &nbsp;|&nbsp; $($jobs.Count) jobs</p>
+<p>Last $LookbackHours hours &nbsp;|&nbsp; $($subs.Count) subscriptions &nbsp;|&nbsp; $($jobs.Count) jobs &nbsp;|&nbsp; $sql SQL</p>
 <p>
   <span class="kpi ok">$ok ok</span>
   <span class="kpi fail">$failed failed</span>
@@ -78,7 +81,7 @@ $pre = @"
 "@
 
 $html = $jobs |
-    Select-Object Item, Vault, Status, Started, Message |
+    Select-Object Item, Workload, Operation, Vault, Status, Started, Message |
     ConvertTo-Html -Head $css -PreContent $pre |
     Out-String
 
@@ -110,4 +113,4 @@ Invoke-RestMethod -Method Post -ContentType 'application/json' -Body $mail `
     -Uri ("https://graph.microsoft.com/v1.0/users/$MailFrom/sendMail") `
     -Headers @{ Authorization = "Bearer $token" }
 
-Write-Output "Jobs=$($jobs.Count) OK=$ok Failed=$failed Warning=$warning Running=$running"
+Write-Output "Jobs=$($jobs.Count) OK=$ok Failed=$failed Warning=$warning Running=$running SQL=$sql"
