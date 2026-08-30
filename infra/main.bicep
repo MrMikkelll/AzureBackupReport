@@ -125,23 +125,9 @@ resource runbook 'Microsoft.Automation/automationAccounts/runbooks@2024-10-23' =
   }
 }
 
-resource jobSchedule 'Microsoft.Automation/automationAccounts/jobSchedules@2023-11-01' = {
-  parent: automationAccount
-  name: guid(automationAccount.id, runbook.name, dailySchedule.name)
-  properties: {
-    runbook: {
-      name: runbook.name
-    }
-    schedule: {
-      name: dailySchedule.name
-    }
-    parameters: {
-      MailFrom: mailFrom
-      MailTo: mailTo
-      LookbackHours: string(lookbackHours)
-    }
-  }
-}
+// Job schedules are omitted on purpose. Azure rejects a second Create with the
+// same GUID ("A jobSchedule with same id already exists"), including after you
+// delete the account. Link Daily to the runbook once in the portal.
 
 output principalId string = automationAccount.identity.principalId
 output automationAccountName string = automationAccount.name
