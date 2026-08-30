@@ -32,24 +32,23 @@ If the portal will not accept a `.bicep` file, deploy with Azure CLI instead (be
 ### Azure CLI
 
 ```bash
-az group create --name rg-backup-report --location westeurope
+az group create --name rg-azbackupreport-bicep --location westeurope
 
 az deployment group create \
-  --resource-group rg-backup-report \
+  --resource-group rg-azbackupreport-bicep \
   --template-file infra/main.bicep \
   --parameters infra/main.parameters.json
 ```
 
 ### PowerShell
 
-```powershell
-New-AzResourceGroup -Name rg-backup-report -Location westeurope
+Edit `infra/main.parameters.json` (`mailFrom`, `mailTo`). Resource group defaults to `rg-azbackupreport-bicep` in `westeurope`.
 
-New-AzResourceGroupDeployment `
-  -ResourceGroupName rg-backup-report `
-  -TemplateFile .\infra\main.bicep `
-  -TemplateParameterFile .\infra\main.parameters.json
+```powershell
+pwsh -File .\infra\deploy.ps1
 ```
+
+If Az modules are missing, the script installs them for the current user. `-MailFrom` and `-MailTo` override the parameter file if you pass them.
 
 Wait until both PowerShell 7.2 modules show **Succeeded** on the Automation Account before the first job runs.
 

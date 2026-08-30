@@ -2,8 +2,11 @@
 // Deploy this file against a resource group. See README.md for portal and CLI steps.
 targetScope = 'resourceGroup'
 
-@description('Azure region for the Automation Account.')
-param location string = resourceGroup().location
+@description('Resource group name. deploy.ps1 creates this group; the ARM deployment still targets it.')
+param resourceGroupName string = 'rg-azbackupreport-bicep'
+
+@description('Azure region. Use a full name such as westeurope (not westeu).')
+param location string = 'westeurope'
 
 @description('Automation Account name.')
 param automationAccountName string = 'aa-backup-report'
@@ -109,3 +112,4 @@ resource jobSchedule 'Microsoft.Automation/automationAccounts/jobSchedules@2023-
 output principalId string = automationAccount.identity.principalId
 output automationAccountName string = automationAccount.name
 output runbookName string = runbook.name
+output resourceGroupName string = resourceGroupName
