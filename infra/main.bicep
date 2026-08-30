@@ -25,10 +25,7 @@ param scheduleStartTime string = dateTimeAdd(utcNow(), 'PT1H')
 @description('Public raw URL of the runbook. Redeploy after you change the .ps1 on GitHub.')
 param runbookUri string = 'https://raw.githubusercontent.com/MrMikkelll/AzureBackupReport/master/New-AzureBackupDailyReport.ps1'
 
-@description('Grant Reader at tenant scope so every subscription is covered. Requires Owner or User Access Administrator at the tenant. A resource-group deploy cannot target a management group.')
-param assignReaderAtTenant bool = true
-
-@description('Extra subscription IDs to grant Reader on. Use when you cannot assign at tenant scope.')
+@description('Other subscription IDs to grant Reader on, besides the subscription you deploy to. Bicep cannot list subscriptions or write at tenant scope without extra Azure permissions.')
 param extraSubscriptionIds string[] = []
 
 var runtimeEnvironmentName = 'PowerShell-76'
@@ -138,14 +135,6 @@ resource runbook 'Microsoft.Automation/automationAccounts/runbooks@2024-10-23' =
 module readerThisSubscription 'sub-reader.bicep' = {
   name: 'reader-this-subscription'
   scope: subscription()
-  params: {
-    principalId: automationAccount.identity.principalId
-  }
-}
-
-module readerTenant 'tenant-reader.bicep' = if (assignReaderAtTenant) {
-  name: 'reader-tenant'
-  scope: tenant()
   params: {
     principalId: automationAccount.identity.principalId
   }
