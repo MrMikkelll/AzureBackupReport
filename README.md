@@ -1,73 +1,32 @@
 # Azure Backup report
 
-PowerShell 7.2 Azure Automation runbook that emails a daily Recovery Services backup job report.
+Azure Automation runbook: [New-AzureBackupDailyReport.ps1](New-AzureBackupDailyReport.ps1)
 
-## Deploy the Bicep template
+Uses the account managed identity with `Connect-AzAccount -Identity` and `Connect-MgGraph -Identity`. Backup jobs come from `Search-AzGraph`. Mail is sent with `Send-MgUserMail`.
 
-The template in [`infra/main.bicep`](infra/main.bicep) creates:
+## Deploy
 
-- Automation Account with a system-assigned managed identity
-- PowerShell 7.2 modules `Az.Accounts` and `Az.ResourceGraph`
-- Runbook `New-AzureBackupDailyReport` (pulled from this GitHub repo)
-- Daily schedule (first run about 1 hour after deploy, then every 24 hours UTC)
-
-Edit [`infra/main.parameters.json`](infra/main.parameters.json) and set `mailFrom` and `mailTo` before you deploy.
-
-### Azure portal
-
-1. Create a resource group (or use an existing one).
-2. In the portal search box, open **Deploy a custom template**.
-3. Choose **Build your own template in the editor**.
-4. **Load file** and select `infra/main.bicep`. Save.
-5. Select the resource group. Fill in:
-
-   - `mailFrom` — existing mailbox UPN (shared mailbox recommended)
-   - `mailTo` — recipients, comma-separated (for example `ops@contoso.com, noc@contoso.com`)
-   - `automationAccountName` — optional, default `aa-backup-report`
-6. **Review + create**, then **Create**.
-7. Open the deployment outputs and copy `principalId`.
-
-If the portal will not accept a `.bicep` file, deploy with Azure CLI instead (below), or paste the compiled JSON from `az bicep build --file infra/main.bicep`.
-
-### Azure CLI
-
-```bash
-az group create --name rg-azbackupreport-bicep --location westeurope
-
-az deployment group create \
-  --resource-group rg-azbackupreport-bicep \
-  --template-file infra/main.bicep \
-  --parameters infra/main.parameters.json
-```
-
-### PowerShell
-
-Edit `infra/main.parameters.json` (`mailFrom`, `mailTo`). Resource group defaults to `rg-azbackupreport-bicep` in `westeurope`.
+Edit [`infra/main.parameters.json`](infra/main.parameters.json) (`mailFrom`, `mailTo`). Resource group defaults to `rg-azbackupreport-bicep` in `westeurope`.
 
 ```powershell
 pwsh -File .\infra\deploy.ps1
 ```
 
-If Az modules are missing, the script installs them for the current user. `-MailFrom` and `-MailTo` override the parameter file if you pass them.
+That creates:
 
-Wait until both PowerShell 7.2 modules show **Succeeded** on the Automation Account before the first job runs.
+- Automation Account with a system-assigned managed identity
+- **PowerShell 7.6** runtime (`PowerShell-76`) with Az 15.1.0, Azure CLI 2.77.0, and Microsoft Graph 2.39.0 (`Authentication`, `Users.Actions`)
+- Daily schedule
+- The runbook uploaded from this repo (not GitHub content-link)
+
+Wait until the Graph packages on that runtime show **Available** before the first job.
 
 ## After deploy
 
-The identity cannot see vaults or send mail until you do these two steps.
-
-**1. Reader on each subscription** (or a management group) that should appear in the report:
+**1. Reader** on each subscription that should appear in the report:
 
 ```powershell
 New-AzRoleAssignment -ObjectId <principalId> -RoleDefinitionName Reader -Scope /subscriptions/<subscriptionId>
 ```
 
-In the portal: Automation Account → **Identity** → **Azure role assignments** → **Add role assignment** → Reader.
-
-**2. Graph permission Mail.Send** on that same identity, sending as `mailFrom`.
-
-The mailbox must already exist. If Graph rejects the send, add an Exchange application access policy for this managed identity.
-
-## Change the runbook later
-
-Push the updated `New-AzureBackupDailyReport.ps1` to `master`, then redeploy the Bicep (it republishes from GitHub). Or in the portal: Runbooks → import the `.ps1` as type **PowerShell 7.2** → Publish → keep it linked to the **Daily** schedule.
+**2. Graph application permission Mail.Send** on that identity, sending as `mailFrom`.
