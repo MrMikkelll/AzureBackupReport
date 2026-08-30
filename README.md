@@ -18,6 +18,10 @@ That creates:
 - **PowerShell 7.6** runtime (`PowerShell-76`) with Az 15.1.0, Azure CLI 2.77.0, and Microsoft Graph 2.39.0
 - Daily schedule (not linked yet — see below)
 - The published runbook, pulled from this repo’s raw GitHub URL
+- **Reader** on the subscription you deploy to, and on Tenant Root Group (every subscription in the tenant)
+- Graph application permission **Mail.Send** on that identity
+
+The account you deploy with needs Owner or User Access Administrator on Tenant Root Group, plus permission to grant Graph app roles (Privileged Role Administrator or Cloud Application Administrator). If Tenant Root fails, set `assignReaderAtTenantRoot` to `false` and pass the other subscription IDs in `extraSubscriptionIds`.
 
 In the portal, open the Automation Account and use **Runtime environment experience** — PowerShell 7.6 runbooks do not show on the old Runbooks blade the same way as 7.2.
 
@@ -27,10 +31,4 @@ Wait until the Graph packages on that runtime show **Available** before the firs
 
 ## After deploy
 
-**1. Reader** on each subscription that should appear in the report:
-
-```powershell
-New-AzRoleAssignment -ObjectId <principalId> -RoleDefinitionName Reader -Scope /subscriptions/<subscriptionId>
-```
-
-**2. Graph application permission Mail.Send** on that identity, sending as `mailFrom`.
+The identity can send as `mailFrom`. If send still fails, add an [Exchange application access policy](https://learn.microsoft.com/exchange/permissions-exo/application-access-policy) that allows that mailbox, or confirm the mailbox exists.

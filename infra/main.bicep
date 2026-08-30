@@ -25,7 +25,14 @@ param scheduleStartTime string = dateTimeAdd(utcNow(), 'PT1H')
 @description('Public raw URL of the runbook. Redeploy after you change the .ps1 on GitHub.')
 param runbookUri string = 'https://raw.githubusercontent.com/MrMikkelll/AzureBackupReport/master/New-AzureBackupDailyReport.ps1'
 
+@description('Grant Reader at Tenant Root Group so every subscription in the tenant is covered. Requires Owner or User Access Administrator on that group.')
+param assignReaderAtTenantRoot bool = true
+
+@description('Extra subscription IDs to grant Reader on. Use when you cannot assign at Tenant Root Group.')
+param extraSubscriptionIds string[] = []
+
 var runtimeEnvironmentName = 'PowerShell-76'
+var readerRoleId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7'
 
 resource automationAccount 'Microsoft.Automation/automationAccounts@2023-11-01' = {
   name: automationAccountName
@@ -128,6 +135,39 @@ resource runbook 'Microsoft.Automation/automationAccounts/runbooks@2024-10-23' =
 // Job schedules are omitted on purpose. Azure rejects a second Create with the
 // same GUID ("A jobSchedule with same id already exists"), including after you
 // delete the account. Link Daily to the runbook once in the portal.
+
+resource readerThisSubscription 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(subscription().id, automationAccount.id, readerRoleId)
+  scope: subscription()
+  properties: {
+    principalId: automationAccount.identity.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', readerRoleId)
+  }
+}
+
+module readerTenantRoot 'mg-reader.bicep' = if (assignReaderAtTenantRoot) {
+  name: 'reader-tenant-root'
+  scope: managementGroup(tenant().tenantId)
+  params: {
+    principalId: automationAccount.identity.principalId
+  }
+}
+
+module readerExtraSubscriptions 'sub-reader.bicep' = [for subId in extraSubscriptionIds: {
+  name: 'reader-${subId}'
+  scope: subscription(subId)
+  params: {
+    principalId: automationAccount.identity.principalId
+  }
+}]
+
+module graphMailSend 'graph-mail-send.bicep' = {
+  name: 'graph-mail-send'
+  params: {
+    principalId: automationAccount.identity.principalId
+  }
+}
 
 output principalId string = automationAccount.identity.principalId
 output automationAccountName string = automationAccount.name
