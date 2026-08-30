@@ -18,10 +18,10 @@ That creates:
 - **PowerShell 7.6** runtime (`PowerShell-76`) with Az 15.1.0, Azure CLI 2.77.0, and Microsoft Graph 2.39.0
 - Daily schedule (not linked yet — see below)
 - The published runbook, pulled from this repo’s raw GitHub URL
-- **Reader** on the subscription you deploy to, and on Tenant Root Group (every subscription in the tenant)
+- **Reader** on the subscription you deploy to, and at tenant scope (every subscription in the tenant)
 - Graph application permission **Mail.Send** on that identity
 
-The account you deploy with needs Owner or User Access Administrator on Tenant Root Group, plus permission to grant Graph app roles (Privileged Role Administrator or Cloud Application Administrator). If Tenant Root fails, set `assignReaderAtTenantRoot` to `false` and pass the other subscription IDs in `extraSubscriptionIds`.
+The account you deploy with needs Owner or User Access Administrator at the tenant, plus permission to grant Graph app roles (Privileged Role Administrator or Cloud Application Administrator). If the tenant assignment fails, set `assignReaderAtTenant` to `false` and pass the other subscription IDs in `extraSubscriptionIds`.
 
 In the portal, open the Automation Account and use **Runtime environment experience** — PowerShell 7.6 runbooks do not show on the old Runbooks blade the same way as 7.2.
 

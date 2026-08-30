@@ -25,14 +25,13 @@ param scheduleStartTime string = dateTimeAdd(utcNow(), 'PT1H')
 @description('Public raw URL of the runbook. Redeploy after you change the .ps1 on GitHub.')
 param runbookUri string = 'https://raw.githubusercontent.com/MrMikkelll/AzureBackupReport/master/New-AzureBackupDailyReport.ps1'
 
-@description('Grant Reader at Tenant Root Group so every subscription in the tenant is covered. Requires Owner or User Access Administrator on that group.')
-param assignReaderAtTenantRoot bool = true
+@description('Grant Reader at tenant scope so every subscription is covered. Requires Owner or User Access Administrator at the tenant. A resource-group deploy cannot target a management group.')
+param assignReaderAtTenant bool = true
 
-@description('Extra subscription IDs to grant Reader on. Use when you cannot assign at Tenant Root Group.')
+@description('Extra subscription IDs to grant Reader on. Use when you cannot assign at tenant scope.')
 param extraSubscriptionIds string[] = []
 
 var runtimeEnvironmentName = 'PowerShell-76'
-var readerRoleId = 'acdd72a7-3385-48ef-bd42-f606fba81ae7'
 
 resource automationAccount 'Microsoft.Automation/automationAccounts@2023-11-01' = {
   name: automationAccountName
@@ -136,19 +135,17 @@ resource runbook 'Microsoft.Automation/automationAccounts/runbooks@2024-10-23' =
 // same GUID ("A jobSchedule with same id already exists"), including after you
 // delete the account. Link Daily to the runbook once in the portal.
 
-resource readerThisSubscription 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(subscription().id, automationAccount.id, readerRoleId)
+module readerThisSubscription 'sub-reader.bicep' = {
+  name: 'reader-this-subscription'
   scope: subscription()
-  properties: {
+  params: {
     principalId: automationAccount.identity.principalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', readerRoleId)
   }
 }
 
-module readerTenantRoot 'mg-reader.bicep' = if (assignReaderAtTenantRoot) {
-  name: 'reader-tenant-root'
-  scope: managementGroup(tenant().tenantId)
+module readerTenant 'tenant-reader.bicep' = if (assignReaderAtTenant) {
+  name: 'reader-tenant'
+  scope: tenant()
   params: {
     principalId: automationAccount.identity.principalId
   }
