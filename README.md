@@ -21,6 +21,8 @@ That creates:
 
 Wait until the Graph packages on that runtime show **Available** before the first job.
 
+A Bicep-only deploy creates an empty 7.6 runbook draft. Run `infra/deploy.ps1` to upload the script and publish it. In the portal, open the Automation Account and use **Runtime environment experience** — PowerShell 7.6 runbooks do not show on the old Runbooks blade the same way as 7.2.
+
 ## After deploy
 
 **1. Reader** on each subscription that should appear in the report:

@@ -69,6 +69,7 @@ $runbookMeta = @{
     }
 } | ConvertTo-Json -Depth 6 -Compress
 
+Write-Output "Uploading $runbookName to runtime $runtimeName..."
 $create = Invoke-AzRestMethod -Method PUT -Path "$runbookPath`?api-version=2024-10-23" -Payload $runbookMeta
 if ($create.StatusCode -notin 200, 201) {
     Write-Output "Replacing the existing runbook so it can use runtime $runtimeName..."

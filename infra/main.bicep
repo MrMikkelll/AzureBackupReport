@@ -106,10 +106,27 @@ resource dailySchedule 'Microsoft.Automation/automationAccounts/schedules@2023-1
   }
 }
 
+// Draft only. deploy.ps1 uploads New-AzureBackupDailyReport.ps1 and publishes it.
+// GitHub content-link is not used: Automation rejects that URI.
+resource runbook 'Microsoft.Automation/automationAccounts/runbooks@2024-10-23' = {
+  parent: automationAccount
+  name: 'New-AzureBackupDailyReport'
+  location: location
+  properties: {
+    description: 'Emails an HTML Azure Backup job report'
+    runbookType: 'PowerShell'
+    runtimeEnvironment: runtimeEnv.name
+    logProgress: false
+    logVerbose: false
+    draft: {}
+  }
+}
+
 output principalId string = automationAccount.identity.principalId
 output automationAccountName string = automationAccount.name
 output resourceGroupName string = resourceGroupName
 output runtimeEnvironmentName string = runtimeEnv.name
+output runbookName string = runbook.name
 output mailFrom string = mailFrom
 output mailTo string = mailTo
 output lookbackHours string = string(lookbackHours)
