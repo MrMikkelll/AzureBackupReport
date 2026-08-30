@@ -1,7 +1,7 @@
 // Automation Account for the daily Azure Backup report (PowerShell 7.6 runtime).
 targetScope = 'resourceGroup'
 
-@description('Resource group name. deploy.ps1 creates this group; the ARM deployment still targets it.')
+@description('Intended resource group. Create it if needed, then deploy this file to it from the Bicep extension.')
 param resourceGroupName string = 'rg-azbackupreport-bicep'
 
 @description('Azure region. Use a full name such as westeurope (not westeu).')
@@ -21,6 +21,9 @@ param lookbackHours int = 24
 
 @description('First scheduled run (UTC). Must be at least 15 minutes in the future. Default: 1 hour from deploy time.')
 param scheduleStartTime string = dateTimeAdd(utcNow(), 'PT1H')
+
+@description('Public raw URL of the runbook. Redeploy after you change the .ps1 on GitHub.')
+param runbookUri string = 'https://raw.githubusercontent.com/MrMikkelll/AzureBackupReport/master/New-AzureBackupDailyReport.ps1'
 
 var runtimeEnvironmentName = 'PowerShell-76'
 
@@ -106,8 +109,6 @@ resource dailySchedule 'Microsoft.Automation/automationAccounts/schedules@2023-1
   }
 }
 
-// Draft only. deploy.ps1 uploads New-AzureBackupDailyReport.ps1 and publishes it.
-// GitHub content-link is not used: Automation rejects that URI.
 resource runbook 'Microsoft.Automation/automationAccounts/runbooks@2024-10-23' = {
   parent: automationAccount
   name: 'New-AzureBackupDailyReport'
@@ -118,7 +119,27 @@ resource runbook 'Microsoft.Automation/automationAccounts/runbooks@2024-10-23' =
     runtimeEnvironment: runtimeEnv.name
     logProgress: false
     logVerbose: false
-    draft: {}
+    publishContentLink: {
+      uri: runbookUri
+    }
+  }
+}
+
+resource jobSchedule 'Microsoft.Automation/automationAccounts/jobSchedules@2023-11-01' = {
+  parent: automationAccount
+  name: guid(automationAccount.id, runbook.name, dailySchedule.name)
+  properties: {
+    runbook: {
+      name: runbook.name
+    }
+    schedule: {
+      name: dailySchedule.name
+    }
+    parameters: {
+      MailFrom: mailFrom
+      MailTo: mailTo
+      LookbackHours: string(lookbackHours)
+    }
   }
 }
 
