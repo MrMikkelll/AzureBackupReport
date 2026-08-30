@@ -5,8 +5,9 @@
     "resourceGroupName": { "value": "rg-azbackupreport-bicep" },
     "location": { "value": "westeurope" },
     "automationAccountName": { "value": "aa-backup-report" },
-    "mailFrom": { "value": "backup-reports@contoso.com" },
-    "mailTo": { "value": "ops@contoso.com, noc@contoso.com" },
-    "lookbackHours": { "value": 24 }
+    "mailFrom": { "value": "mldtest@mlddamgaard.onmicrosoft.com" },
+    "mailTo": { "value": "mld.damgaard@gmail.com" },
+    "lookbackHours": { "value": 24 },
+    "extraSubscriptionIds": { "value": [] }
   }
 }
